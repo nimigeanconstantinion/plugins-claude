@@ -1,0 +1,7 @@
+{
+  "name": "pr-review",
+  "version": "0.1.0",
+  "description": "Revizie de pull request pentru CI: corectitudine, securitate si baza de date in paralel, constatarile grave verificate adversarial, raport JSON + Markdown",
+  "author": { "name": "nimigeanconstantinion" },
+  "keywords": ["ci", "github-actions", "code-review", "security", "database"]
+}

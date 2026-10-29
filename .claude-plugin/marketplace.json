@@ -1,0 +1,32 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "plugins-claude",
+  "description": "Pluginuri Claude Code pentru pipeline-uri CI (GitHub Actions): revizie de PR, verificare, reparare automata, release",
+  "owner": { "name": "nimigeanconstantinion" },
+  "plugins": [
+    {
+      "name": "pr-review",
+      "description": "Revizie de pull request: corectitudine, securitate, baza de date; constatarile grave verificate adversarial; raport JSON + Markdown",
+      "source": "./plugins/pr-review",
+      "category": "ci"
+    },
+    {
+      "name": "verify",
+      "description": "Verificare independenta: build + teste, PASS/FAIL cu dovezi si cauze infra/toolkit/cod",
+      "source": "./plugins/verify",
+      "category": "ci"
+    },
+    {
+      "name": "auto-fix",
+      "description": "Reparare automata: fix + test care reproduce problema, verificare independenta in bucla, corpul PR-ului",
+      "source": "./plugins/auto-fix",
+      "category": "ci"
+    },
+    {
+      "name": "release",
+      "description": "Release: imagine cu tag sha7, image.tag in repo-ul GitOps, verificare ArgoCD; push/commit doar la cerere",
+      "source": "./plugins/release",
+      "category": "ci"
+    }
+  ]
+}

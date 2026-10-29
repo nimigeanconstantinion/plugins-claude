@@ -1,0 +1,47 @@
+name: Setup Claude Code + plugins-claude
+description: Instaleaza Claude Code, activeaza workflow-urile si instaleaza pluginurile cerute din marketplace-ul plugins-claude
+inputs:
+  plugins:
+    description: Pluginurile de instalat, separate prin spatiu (pr-review verify auto-fix release)
+    required: true
+  marketplace:
+    description: Repo-ul marketplace-ului (owner/repo)
+    default: nimigeanconstantinion/plugins-claude
+  marketplace-token:
+    description: Token cu acces de citire la marketplace, doar daca repo-ul e privat
+    default: ''
+  claude-version:
+    description: Versiunea pachetului @anthropic-ai/claude-code (fixeaz-o pentru build-uri reproductibile)
+    default: latest
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Instaleaza Claude Code
+      shell: bash
+      run: npm install -g "@anthropic-ai/claude-code@${{ inputs.claude-version }}" && claude --version
+
+    - name: Activeaza workflow-urile
+      shell: bash
+      run: |
+        mkdir -p ~/.claude
+        echo '{ "enableWorkflows": true }' > ~/.claude/settings.json
+
+    - name: Acces la marketplace privat
+      if: inputs.marketplace-token != ''
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.marketplace-token }}
+      run: git config --global url."https://x-access-token:${TOKEN}@github.com/${{ inputs.marketplace }}".insteadOf "https://github.com/${{ inputs.marketplace }}"
+
+    - name: Instaleaza pluginurile
+      shell: bash
+      run: |
+        claude plugin marketplace add "${{ inputs.marketplace }}"
+        for p in ${{ inputs.plugins }}; do
+          claude plugin install "$p@plugins-claude"
+        done
+        claude plugin list

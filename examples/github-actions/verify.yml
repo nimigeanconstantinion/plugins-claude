@@ -1,0 +1,51 @@
+# Verificare independenta: build + teste (Testcontainers merge pe ubuntu-latest, Docker e preinstalat).
+name: Claude verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: nimigeanconstantinion/plugins-claude/.github/actions/setup-claude@main
+        with:
+          plugins: verify
+
+      - name: Verificare
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          OUT="$RUNNER_TEMP/claude"
+          mkdir -p "$OUT"
+          claude -p "/verify:run {\"service\":\".\",\"outDir\":\"$OUT\"}" \
+            --allowedTools "Workflow Agent Skill Read Grep Glob Write Bash" \
+            | tee "$OUT/stdout.txt"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Rezumat
+        if: always() && env.OUT != ''
+        run: '[ -f "$OUT/verify.md" ] && cat "$OUT/verify.md" >> "$GITHUB_STEP_SUMMARY"'
+
+      - name: Verdict
+        run: '[ "$(jq -r .verdict "$OUT/verify.json" 2>/dev/null)" = "pass" ]'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: claude-verify
+          path: ${{ env.OUT }}

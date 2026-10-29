@@ -1,0 +1,60 @@
+# Revizie Claude pe fiecare pull request: comentariu pe PR, job picat la constatari critice.
+# Cere in repo secretul ANTHROPIC_API_KEY (sau CLAUDE_CODE_OAUTH_TOKEN). Copiaza in .github/workflows/ al proiectului.
+name: Claude PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: claude-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: nimigeanconstantinion/plugins-claude/.github/actions/setup-claude@main
+        with:
+          plugins: pr-review
+
+      - name: Revizie
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          OUT="$RUNNER_TEMP/claude"
+          mkdir -p "$OUT"
+          claude -p "/pr-review:run {\"base\":\"$BASE\",\"outDir\":\"$OUT\",\"failOn\":\"critic\"}" \
+            --allowedTools "Workflow Agent Skill Read Grep Glob Write Bash(git *) Bash(mkdir *) Bash(ls *) Bash(cat *) Bash(find *)" \
+            | tee "$OUT/stdout.txt"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Comentariu pe PR
+        if: always() && env.OUT != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f "$OUT/pr-review.md" ] && gh pr comment "${{ github.event.pull_request.number }}" --body-file "$OUT/pr-review.md" --edit-last --create-if-none
+
+      - name: Verdict
+        run: |
+          VERDICT=$(jq -r .verdict "$OUT/pr-review.json" 2>/dev/null || echo error)
+          echo "Verdict: $VERDICT"
+          jq -r '"critic=\(.counts.critic) mare=\(.counts.mare) mediu=\(.counts.mediu) mic=\(.counts.mic)"' "$OUT/pr-review.json" || true
+          [ "$VERDICT" = "pass" ]
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: claude-pr-review
+          path: ${{ env.OUT }}

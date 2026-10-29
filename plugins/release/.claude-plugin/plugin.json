@@ -1,0 +1,7 @@
+{
+  "name": "release",
+  "version": "0.1.0",
+  "description": "Release din CI: imagine cu tag-ul commit-ului, image.tag in repo-ul GitOps, verificare read-only ArgoCD; push si commit doar la cerere explicita",
+  "author": { "name": "nimigeanconstantinion" },
+  "keywords": ["ci", "github-actions", "release", "docker", "gitops", "argocd"]
+}

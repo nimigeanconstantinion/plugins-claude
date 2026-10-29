@@ -1,0 +1,64 @@
+# Reparare automata: la eticheta "claude-fix" pe un issue, Claude repara, verifica si deschide un PR pentru aprobare umana.
+# Nu face merge; PR-ul trece apoi prin pr-review si verify ca orice alt PR.
+name: Claude auto-fix
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  fix:
+    if: github.event.label.name == 'claude-fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: nimigeanconstantinion/plugins-claude/.github/actions/setup-claude@main
+        with:
+          plugins: auto-fix
+
+      - name: Reparare
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          OUT="$RUNNER_TEMP/claude"
+          mkdir -p "$OUT"
+          # Textul issue-ului merge printr-un fisier, nu in linia de comanda.
+          printf '%s\n\n%s\n' "$ISSUE_TITLE" "$ISSUE_BODY" > "$OUT/task.txt"
+          claude -p "/auto-fix:run {\"taskFile\":\"$OUT/task.txt\",\"service\":\".\",\"maxFixes\":2,\"outDir\":\"$OUT\"}" \
+            --allowedTools "Workflow Agent Skill Read Grep Glob Write Edit Bash" \
+            | tee "$OUT/stdout.txt"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERDICT=$(jq -r .verdict "$OUT/auto-fix.json" 2>/dev/null || echo error)
+          N=${{ github.event.issue.number }}
+          if [ "$VERDICT" != "fixed" ]; then
+            gh issue comment "$N" --body-file "$OUT/auto-fix.md" 2>/dev/null || gh issue comment "$N" --body "Reparare automata: $VERDICT"
+            exit 1
+          fi
+          git config user.name "claude-auto-fix[bot]"
+          git config user.email "claude-auto-fix@users.noreply.github.com"
+          BRANCH="claude/fix-issue-$N"
+          git checkout -b "$BRANCH"
+          git add -A -- . ':!.claude-ci'
+          git commit -m "fix: $(jq -r .summary "$OUT/auto-fix.json" | head -c 70) (#$N)"
+          git push -u origin "$BRANCH"
+          gh pr create --title "Reparare automata: issue #$N" --body-file "$OUT/auto-fix.md" --head "$BRANCH"

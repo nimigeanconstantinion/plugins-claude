@@ -1,0 +1,61 @@
+# Release dupa merge pe main. Registry-ul localhost:5000 si clusterul rancher-desktop sunt pe PC-ul tau, deci job-ul
+# ruleaza pe un runner self-hosted instalat acolo (un runner GitHub-hosted nu le vede).
+name: Claude release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: [self-hosted]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout repo GitOps
+        uses: actions/checkout@v4
+        with:
+          repository: nimigeanconstantinion/argo-test-proiect-claude
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+
+      - uses: nimigeanconstantinion/plugins-claude/.github/actions/setup-claude@main
+        with:
+          plugins: release
+
+      - name: Release
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          OUT="$RUNNER_TEMP/claude"
+          mkdir -p "$OUT"
+          ARGS=$(jq -cn --arg gitops "$GITHUB_WORKSPACE/gitops" --arg out "$OUT" '{
+            image: "localhost:5000/personal-service",
+            gitopsRepo: $gitops,
+            valuesFile: "charts/personal-service/values.yaml",
+            push: true, commit: true, pushGitops: true,
+            kubeContext: "rancher-desktop", argoApp: "personal-service",
+            outDir: $out }')
+          claude -p "/release:run $ARGS" \
+            --allowedTools "Workflow Agent Skill Read Grep Glob Write Edit Bash" \
+            | tee "$OUT/stdout.txt"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Rezumat
+        if: always() && env.OUT != ''
+        run: '[ -f "$OUT/release.md" ] && cat "$OUT/release.md" >> "$GITHUB_STEP_SUMMARY"'
+
+      - name: Verdict
+        run: |
+          V=$(jq -r .verdict "$OUT/release.json" 2>/dev/null || echo error)
+          echo "Verdict: $V"
+          case "$V" in deployed|pushed) exit 0 ;; *) exit 1 ;; esac
