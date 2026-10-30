@@ -55,8 +55,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERDICT=$(jq -r .verdict "$OUT/auto-fix.json" 2>/dev/null || echo error)
           N=${{ github.event.issue.number }}
+          if [ ! -f "$OUT/auto-fix.json" ]; then
+            echo "::error::Raport lipsa: auto-fix.json nu a fost scris (vezi stdout.txt in artefact)"
+            gh issue comment "$N" --body "Reparare automata: raport lipsa, vezi rularea din Actions"
+            exit 1
+          fi
+          VERDICT=$(jq -r .verdict "$OUT/auto-fix.json" 2>/dev/null || echo error)
           if [ "$VERDICT" != "fixed" ]; then
             gh issue comment "$N" --body-file "$OUT/auto-fix.md" 2>/dev/null || gh issue comment "$N" --body "Reparare automata: $VERDICT"
             exit 1

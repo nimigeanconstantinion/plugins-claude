@@ -63,6 +63,7 @@ jobs:
 
       - name: Verdict
         run: |
+          [ -f "$OUT/release.json" ] || { echo "::error::Raport lipsa: release.json nu a fost scris (vezi stdout.txt in artefact)"; exit 1; }
           V=$(jq -r .verdict "$OUT/release.json" 2>/dev/null || echo error)
           echo "Verdict: $V"
           case "$V" in deployed|pushed) exit 0 ;; *) exit 1 ;; esac
