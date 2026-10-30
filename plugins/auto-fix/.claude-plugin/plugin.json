@@ -1,6 +1,6 @@
 {
   "name": "auto-fix",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reparare automata pentru CI: fix + test care reproduce problema, verificare independenta in bucla, corpul PR-ului; fara commit (il face pipeline-ul)",
   "author": { "name": "nimigeanconstantinion" },
   "keywords": ["ci", "github-actions", "auto-fix", "spring-boot"]

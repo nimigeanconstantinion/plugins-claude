@@ -58,6 +58,12 @@ const WRITTEN = {
   required: ['json', 'markdown'],
 }
 
+const CHECKED = {
+  type: 'object',
+  properties: { jsonOk: { type: 'boolean' }, mdOk: { type: 'boolean' }, problem: { type: 'string' } },
+  required: ['jsonOk', 'mdOk', 'problem'],
+}
+
 phase('Garda')
 let opts = args
 if (typeof opts === 'string') {
@@ -126,13 +132,28 @@ const report = {
 }
 
 phase('Raport')
-const written = await agent(
+// Fisierele le scrie un agent, deci pot lipsi; CI citeste verdictul din JSON, asa ca le recitim si rescriem o data.
+const reportFiles = { json: `${opts.outDir}/auto-fix.json`, markdown: `${opts.outDir}/auto-fix.md` }
+const writePrompt =
   `Scrie doua fisiere in folderul ${opts.outDir} (creeaza-l daca lipseste). Nu modifica alte fisiere.\n` +
   `1. auto-fix.json: EXACT obiectul JSON de mai jos, neschimbat, formatat cu 2 spatii.\n` +
   `2. auto-fix.md: corpul unui pull request, in romana: titlu "## Reparare automata: <rezumat scurt>", cauza, ce s-a schimbat ` +
   `(fisiere), testele adaugate, rezultatul verificarii independente (tabel), deciziile si o nota ca PR-ul cere revizie umana. ` +
   `Pentru verdict "gave-up" sau "failed": de ce nu s-a reparat. Fara alt text.\n` +
-  `Intoarce caile absolute ale fisierelor.\n\nJSON:\n${JSON.stringify(report, null, 2)}`,
-  { phase: 'Raport', label: 'raport', schema: WRITTEN, effort: 'low' })
+  `Intoarce caile absolute ale fisierelor.\n\nJSON:\n${JSON.stringify(report, null, 2)}`
 
-return { ...report, files: written || null }
+let written = null
+let reportOk = false
+for (let attempt = 1; attempt <= 2 && !reportOk; attempt++) {
+  const writeOpts = { phase: 'Raport', label: `raport:${attempt}`, schema: WRITTEN }
+  written = await agent(writePrompt, attempt === 1 ? { ...writeOpts, effort: 'low' } : writeOpts)
+  const check = await agent(
+    `Citeste ${reportFiles.json} si ${reportFiles.markdown}. Nu modifica nimic.\n` +
+    `jsonOk = fisierul JSON exista, e JSON valid si are "verdict": "${report.verdict}". mdOk = fisierul Markdown exista si nu e gol. ` +
+    `problem = ce lipseste sau difera, sau "" daca ambele sunt in regula.`,
+    { phase: 'Raport', label: `verificare-raport:${attempt}`, schema: CHECKED, effort: 'low' })
+  reportOk = Boolean(check && check.jsonOk && check.mdOk)
+  if (!reportOk) log(`Raport incomplet (incercarea ${attempt}): ${(check && check.problem) || 'verificarea nu a raspuns'}`)
+}
+
+return { ...report, files: written || null, reportOk }
