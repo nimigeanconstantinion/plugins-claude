@@ -14,6 +14,11 @@ concurrency:
   group: claude-release
   cancel-in-progress: false
 
+# shell: bash = bash -eo pipefail: un esec al lui claude nu e ascuns de `| tee`.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   release:
     runs-on: [self-hosted]
@@ -35,7 +40,9 @@ jobs:
       - name: Release
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
+          [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] || { echo "::error::Lipseste secretul ANTHROPIC_API_KEY sau CLAUDE_CODE_OAUTH_TOKEN (gol sau nesetat)"; exit 1; }
           OUT="$RUNNER_TEMP/claude"
           mkdir -p "$OUT"
           ARGS=$(jq -cn --arg gitops "$GITHUB_WORKSPACE/gitops" --arg out "$OUT" '{
@@ -52,7 +59,7 @@ jobs:
 
       - name: Rezumat
         if: always() && env.OUT != ''
-        run: '[ -f "$OUT/release.md" ] && cat "$OUT/release.md" >> "$GITHUB_STEP_SUMMARY"'
+        run: if [ -f "$OUT/release.md" ]; then cat "$OUT/release.md" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Verdict
         run: |

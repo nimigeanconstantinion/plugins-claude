@@ -14,6 +14,11 @@ concurrency:
   group: claude-pr-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# shell: bash = bash -eo pipefail: un esec al lui claude nu e ascuns de `| tee`.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -30,7 +35,9 @@ jobs:
       - name: Revizie
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
+          [ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] || { echo "::error::Lipseste secretul ANTHROPIC_API_KEY sau CLAUDE_CODE_OAUTH_TOKEN (gol sau nesetat)"; exit 1; }
           BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
           OUT="$RUNNER_TEMP/claude"
           mkdir -p "$OUT"
@@ -44,7 +51,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          [ -f "$OUT/pr-review.md" ] && gh pr comment "${{ github.event.pull_request.number }}" --body-file "$OUT/pr-review.md" --edit-last --create-if-none
+          if [ -f "$OUT/pr-review.md" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file "$OUT/pr-review.md" --edit-last --create-if-none
+          fi
 
       - name: Verdict
         run: |
