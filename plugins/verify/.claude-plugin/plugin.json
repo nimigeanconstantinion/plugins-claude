@@ -1,6 +1,6 @@
 {
   "name": "verify",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Verificare independenta pentru CI: build + teste, PASS/FAIL cu dovezi si cauze clasificate infra/toolkit/cod, raport JSON + Markdown",
   "author": { "name": "nimigeanconstantinion" },
   "keywords": ["ci", "github-actions", "testing", "verification"]

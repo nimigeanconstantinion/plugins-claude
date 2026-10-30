@@ -57,6 +57,7 @@ jobs:
 
       - name: Verdict
         run: |
+          [ -f "$OUT/pr-review.json" ] || { echo "::error::Raport lipsa: pr-review.json nu a fost scris (vezi stdout.txt in artefactul claude-pr-review)"; exit 1; }
           VERDICT=$(jq -r .verdict "$OUT/pr-review.json" 2>/dev/null || echo error)
           echo "Verdict: $VERDICT"
           jq -r '"critic=\(.counts.critic) mare=\(.counts.mare) mediu=\(.counts.mediu) mic=\(.counts.mic)"' "$OUT/pr-review.json" || true

@@ -49,7 +49,11 @@ jobs:
         run: if [ -f "$OUT/verify.md" ]; then cat "$OUT/verify.md" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Verdict
-        run: '[ "$(jq -r .verdict "$OUT/verify.json" 2>/dev/null)" = "pass" ]'
+        run: |
+          [ -f "$OUT/verify.json" ] || { echo "::error::Raport lipsa: verify.json nu a fost scris (vezi stdout.txt in artefactul claude-verify)"; exit 1; }
+          VERDICT=$(jq -r .verdict "$OUT/verify.json" 2>/dev/null || echo error)
+          echo "Verdict: $VERDICT"
+          [ "$VERDICT" = "pass" ]
 
       - uses: actions/upload-artifact@v4
         if: always()
